@@ -34,7 +34,7 @@ export interface FileAnalysis {
 
 import axios from 'axios';
 
-async function callCopilotForSecurityAnalysis(code: string, language: string): Promise<CodeIssue[]> {
+async function callCopilotForAnalysis(code: string, language: string, analysisType: IssueType): Promise<CodeIssue[]> {
     try {
         const apiKey = process.env.GITHUB_TOKEN;
         if (!apiKey) {
@@ -42,19 +42,8 @@ async function callCopilotForSecurityAnalysis(code: string, language: string): P
             return [];
         }
 
-        const prompt = `Analyze the following ${language} code for security vulnerabilities and return a JSON array of issues. 
-
-Each issue should have this structure:
-{
-    "title": "Brief issue title",
-    "description": "Detailed description of the security issue",
-    "severity": "low|medium|high|critical",
-    "type": "security",
-    "line": number (if applicable),
-    "rule": "security rule identifier",
-    "recommendation": "How to fix this issue",
-    "codeSnippet": "relevant code snippet"
-}
+        const prompts = {
+            security: `Analyze the following ${language} code for security vulnerabilities and return a JSON array of issues.
 
 Focus on common security vulnerabilities like:
 - SQL injection
@@ -65,6 +54,81 @@ Focus on common security vulnerabilities like:
 - Insecure data handling
 - Path traversal
 - Command injection
+- Hardcoded credentials/secrets
+- Weak cryptography
+- Insecure random number generation`,
+
+            quality: `Analyze the following ${language} code for quality issues and return a JSON array of issues.
+
+Focus on code quality issues like:
+- Code complexity (cyclomatic complexity, nesting depth)
+- Code duplication
+- Long methods/functions
+- Large classes
+- Magic numbers and strings
+- Poor naming conventions
+- Long parameter lists
+- Dead code
+- Code smells
+- Maintainability issues`,
+
+            performance: `Analyze the following ${language} code for performance issues and return a JSON array of issues.
+
+Focus on performance problems like:
+- Inefficient algorithms
+- Memory leaks
+- Unnecessary object creation
+- Inefficient loops
+- Database query optimization
+- Caching opportunities
+- Resource management
+- Blocking operations
+- CPU-intensive operations
+- Network optimization`,
+
+            'best-practice': `Analyze the following ${language} code for best practice violations and return a JSON array of issues.
+
+Focus on best practice violations like:
+- Language-specific conventions
+- Design patterns misuse
+- Error handling practices
+- Logging practices
+- Code organization
+- Documentation standards
+- Testing practices
+- Accessibility issues
+- API design
+- Code style consistency
+- Framework-specific best practices`,
+
+            bug: `Analyze the following ${language} code for potential bugs and return a JSON array of issues.
+
+Focus on potential bugs like:
+- Null pointer exceptions
+- Array/buffer overflows
+- Race conditions
+- Logic errors
+- Type mismatches
+- Unhandled exceptions
+- Resource leaks
+- Infinite loops
+- Off-by-one errors
+- Concurrent access issues`
+        };
+
+        const prompt = `${prompts[analysisType]}
+
+Each issue should have this structure:
+{
+    "title": "Brief issue title",
+    "description": "Detailed description of the issue",
+    "severity": "low|medium|high|critical",
+    "type": "${analysisType}",
+    "line": number (line number where issue occurs, if applicable),
+    "rule": "rule identifier or pattern name",
+    "recommendation": "Specific steps to fix this issue",
+    "codeSnippet": "relevant code snippet showing the issue"
+}
 
 Code to analyze:
 \`\`\`${language}
@@ -110,14 +174,14 @@ Return only valid JSON array of issues, no additional text.`;
 
         try {
             const issues: CodeIssue[] = JSON.parse(jsonText);
-            return Array.isArray(issues) ? issues : [];
+            return Array.isArray(issues) ? issues.filter(issue => issue.type === analysisType) : [];
         } catch (parseError) {
             console.error('Failed to parse Copilot response as JSON:', parseError);
             return [];
         }
 
     } catch (error) {
-        console.error('Copilot API analysis failed:', error);
+        console.error(`Copilot API ${analysisType} analysis failed:`, error);
         return [];
     }
 }
@@ -156,20 +220,41 @@ export class CodeAnalyzer {
 
         // Parse diff to extract added/modified lines
         const addedLines = this.extractAddedLines(diffContent);
+        const codeToAnalyze = addedLines.map(l => l.line).join('\n');
 
-        // Analyze for security issues using GitHub Copilot
-        if (includeSecurity) {
-            const codeToAnalyze = addedLines.map(l => l.line).join('\n');
-            const copilotIssues = await callCopilotForSecurityAnalysis(codeToAnalyze, detectedLanguage);
-            // Optionally, map line numbers if Copilot returns them differently
-            issues.push(...copilotIssues);
+        // Skip analysis if no meaningful code changes
+        if (codeToAnalyze.trim().length === 0) {
+            return {
+                fileName: filePath,
+                language: detectedLanguage,
+                lineCount: addedLines.length,
+                issues: [],
+                metrics: {
+                    complexity: 1,
+                    maintainability: 100,
+                    duplicateLines: 0,
+                },
+            };
         }
 
-        // Analyze for code quality issues (local, not via Claude)
-        issues.push(...this.analyzeQualityIssues(addedLines, detectedLanguage));
+        // Analyze for all types of issues using GitHub Copilot
+        const analysisTypes: IssueType[] = ['security', 'quality', 'best-practice', 'performance', 'bug'];
+        
+        for (const analysisType of analysisTypes) {
+            // Skip security analysis if not requested
+            if (analysisType === 'security' && !includeSecurity) {
+                continue;
+            }
 
-        // Analyze for best practices (local, not via Claude)
-        issues.push(...this.analyzeBestPractices(addedLines, detectedLanguage));
+            try {
+                const copilotIssues = await callCopilotForAnalysis(codeToAnalyze, detectedLanguage, analysisType);
+                // Map line numbers from analysis to actual diff line numbers
+                const mappedIssues = this.mapLineNumbers(copilotIssues, addedLines);
+                issues.push(...mappedIssues);
+            } catch (error) {
+                console.error(`Failed to analyze ${analysisType} issues:`, error);
+            }
+        }
 
         return {
             fileName: filePath,
@@ -223,19 +308,21 @@ export class CodeAnalyzer {
         return addedLines;
     }
 
-    // The following methods remain local and do not use Claude
-
-    private analyzeQualityIssues(_lines: { line: string; lineNumber: number }[], _language: string): CodeIssue[] {
-        // You can keep your local quality patterns or call Claude for quality if desired
-        // For now, this is a stub that returns an empty array
-        return [];
+    private mapLineNumbers(issues: CodeIssue[], addedLines: { line: string; lineNumber: number }[]): CodeIssue[] {
+        return issues.map(issue => {
+            if (issue.line && issue.line <= addedLines.length) {
+                const actualLineInfo = addedLines[issue.line - 1];
+                if (actualLineInfo) {
+                    return {
+                        ...issue,
+                        line: actualLineInfo.lineNumber
+                    };
+                }
+            }
+            return issue;
+        });
     }
 
-    private analyzeBestPractices(_lines: { line: string; lineNumber: number }[], _language: string): CodeIssue[] {
-        // You can keep your local best practice checks or call Claude for best-practices if desired
-        // For now, this is a stub that returns an empty array
-        return [];
-    }
 
     private calculateComplexity(lines: { line: string; lineNumber: number }[], _language: string): number {
         let complexity = 1; // Base complexity
