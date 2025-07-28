@@ -232,7 +232,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Security
 
-If you discover a security vulnerability, please send an email to security@yourdomain.com. All security vulnerabilities will be promptly addressed.
+If you discover a security vulnerability, please send an email to [nguyentruonggiang91@gmail.com](mailto:nguyentruonggiang91@gmail.com). All security vulnerabilities will be promptly addressed.
 
 ## Changelog
 
