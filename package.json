@@ -1,5 +1,5 @@
 {
-    "name": "github-pr-review-mcp",
+    "name": "github-review",
     "version": "1.0.0",
     "description": "MCP server for reviewing GitHub pull requests, analyzing code changes, and identifying issues and security vulnerabilities",
     "main": "dist/index.js",

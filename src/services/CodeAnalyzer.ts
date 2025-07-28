@@ -32,26 +32,90 @@ export interface FileAnalysis {
     };
 }
 
-// Call the 'claude-analyze' command to analyze issues in the code
-import { exec as _exec } from 'child_process';
-import util from 'util';
-const execPromise = util.promisify(_exec);
+import axios from 'axios';
 
-async function callClaudeForSecurityAnalysis(code: string, language: string): Promise<CodeIssue[]> {
+async function callCopilotForSecurityAnalysis(code: string, language: string): Promise<CodeIssue[]> {
     try {
-        // Prepare the command to call Claude analyzer (replace with actual command or API call)
-        // For example: claude-analyze --lang=LANGUAGE
-        const command = `claude-analyze --lang=${language}`;
-        // Pass code to stdin using echo and pipe, or use input option if supported
-        // Here we use echo and pipe for simplicity
-        // Note: This may not work for large code or code with special characters; adapt as needed
-        const { stdout } = await execPromise(`echo ${JSON.stringify(code)} | ${command}`);
-        // Assume Claude returns JSON array of issues
-        const issues: CodeIssue[] = JSON.parse(stdout);
-        return issues;
+        const apiKey = process.env.GITHUB_TOKEN;
+        if (!apiKey) {
+            console.warn('GITHUB_TOKEN not found, skipping Copilot analysis');
+            return [];
+        }
+
+        const prompt = `Analyze the following ${language} code for security vulnerabilities and return a JSON array of issues. 
+
+Each issue should have this structure:
+{
+    "title": "Brief issue title",
+    "description": "Detailed description of the security issue",
+    "severity": "low|medium|high|critical",
+    "type": "security",
+    "line": number (if applicable),
+    "rule": "security rule identifier",
+    "recommendation": "How to fix this issue",
+    "codeSnippet": "relevant code snippet"
+}
+
+Focus on common security vulnerabilities like:
+- SQL injection
+- XSS vulnerabilities  
+- Authentication/authorization issues
+- Input validation problems
+- Cryptographic issues
+- Insecure data handling
+- Path traversal
+- Command injection
+
+Code to analyze:
+\`\`\`${language}
+${code}
+\`\`\`
+
+Return only valid JSON array of issues, no additional text.`;
+
+        const response = await axios.post(
+            'https://api.githubcopilot.com/chat/completions',
+            {
+                model: 'gpt-4o',
+                max_tokens: 4000,
+                messages: [
+                    {
+                        role: 'user',
+                        content: prompt
+                    }
+                ]
+            },
+            {
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                timeout: 30000
+            }
+        );
+
+        const content = response.data.choices[0]?.message?.content;
+        if (!content) {
+            return [];
+        }
+
+        // Extract JSON from response if wrapped in markdown
+        let jsonText = content.trim();
+        const jsonMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (jsonMatch) {
+            jsonText = jsonMatch[1];
+        }
+
+        try {
+            const issues: CodeIssue[] = JSON.parse(jsonText);
+            return Array.isArray(issues) ? issues : [];
+        } catch (parseError) {
+            console.error('Failed to parse Copilot response as JSON:', parseError);
+            return [];
+        }
+
     } catch (error) {
-        // If Claude fails, log and return empty array
-        console.error('Claude analysis failed:', error);
+        console.error('Copilot API analysis failed:', error);
         return [];
     }
 }
@@ -91,12 +155,12 @@ export class CodeAnalyzer {
         // Parse diff to extract added/modified lines
         const addedLines = this.extractAddedLines(diffContent);
 
-        // Analyze for security issues using Claude
+        // Analyze for security issues using GitHub Copilot
         if (includeSecurity) {
             const codeToAnalyze = addedLines.map(l => l.line).join('\n');
-            const claudeIssues = await callClaudeForSecurityAnalysis(codeToAnalyze, detectedLanguage);
-            // Optionally, map line numbers if Claude returns them differently
-            issues.push(...claudeIssues);
+            const copilotIssues = await callCopilotForSecurityAnalysis(codeToAnalyze, detectedLanguage);
+            // Optionally, map line numbers if Copilot returns them differently
+            issues.push(...copilotIssues);
         }
 
         // Analyze for code quality issues (local, not via Claude)

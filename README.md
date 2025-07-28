@@ -22,8 +22,8 @@ An MCP (Model Context Protocol) server for comprehensive GitHub Pull Request rev
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/github-pr-review-mcp.git
-cd github-pr-review-mcp
+git clone https://github.com/doraemon0905/github-review.git
+cd github-review
 ```
 
 2. Install dependencies:
@@ -59,7 +59,7 @@ Add the following configuration to your MCP settings:
 {
   "github-pr-review": {
     "command": "node",
-    "args": ["/path/to/github-pr-review-mcp/dist/index.js"],
+    "args": ["/path/to/github-review/dist/index.js"],
     "env": {
       "GITHUB_TOKEN": "your_github_token_here"
     }
