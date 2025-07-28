@@ -8,9 +8,9 @@ import {
     ListToolsRequestSchema,
     McpError,
 } from '@modelcontextprotocol/sdk/types.js';
-import { GitHubService } from './services/GitHubService';
-import { PRReviewer } from './services/PRReviewer';
-import { CodeAnalyzer } from './services/CodeAnalyzer';
+import { GitHubService } from './services/GitHubService.js';
+import { PRReviewer } from './services/PRReviewer.js';
+import { CodeAnalyzer } from './services/CodeAnalyzer.js';
 
 class GitHubPRReviewServer {
     private server: Server;

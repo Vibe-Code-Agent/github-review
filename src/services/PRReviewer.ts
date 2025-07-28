@@ -1,5 +1,5 @@
-import { GitHubService, PullRequest, PullRequestFile } from './GitHubService';
-import { CodeAnalyzer, FileAnalysis, Severity, CodeIssue } from './CodeAnalyzer';
+import { GitHubService, PullRequest, PullRequestFile } from './GitHubService.js';
+import { CodeAnalyzer, FileAnalysis, Severity, CodeIssue } from './CodeAnalyzer.js';
 
 export interface PRReviewRequest {
     owner: string;

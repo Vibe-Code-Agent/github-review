@@ -1,6 +1,7 @@
 {
     "name": "github-review",
     "version": "1.0.0",
+    "type": "module",
     "description": "MCP server for reviewing GitHub pull requests, analyzing code changes, and identifying issues and security vulnerabilities",
     "main": "dist/index.js",
     "scripts": {
