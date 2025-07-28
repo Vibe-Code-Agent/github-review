@@ -12,7 +12,7 @@ export interface PullRequestFile {
     additions: number;
     deletions: number;
     changes: number;
-    patch?: string;
+    patch: string | undefined;
     contents_url: string;
     raw_url: string;
 }
@@ -126,13 +126,13 @@ export class GitHubService {
         }
     }
 
-    async getFileContent(owner: string, repo: string, path: string, ref?: string): Promise<string> {
+    async getFileContent(owner: string, repo: string, path: string, ref: string | undefined = undefined): Promise<string> {
         try {
             const response = await this.octokit.rest.repos.getContent({
                 owner,
                 repo,
                 path,
-                ref,
+                ...(ref && { ref }),
             });
 
             if (Array.isArray(response.data) || response.data.type !== 'file') {

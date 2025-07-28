@@ -225,19 +225,19 @@ export class CodeAnalyzer {
 
     // The following methods remain local and do not use Claude
 
-    private analyzeQualityIssues(lines: { line: string; lineNumber: number }[], language: string): CodeIssue[] {
+    private analyzeQualityIssues(_lines: { line: string; lineNumber: number }[], _language: string): CodeIssue[] {
         // You can keep your local quality patterns or call Claude for quality if desired
         // For now, this is a stub that returns an empty array
         return [];
     }
 
-    private analyzeBestPractices(lines: { line: string; lineNumber: number }[], language: string): CodeIssue[] {
+    private analyzeBestPractices(_lines: { line: string; lineNumber: number }[], _language: string): CodeIssue[] {
         // You can keep your local best practice checks or call Claude for best-practices if desired
         // For now, this is a stub that returns an empty array
         return [];
     }
 
-    private calculateComplexity(lines: { line: string; lineNumber: number }[], language: string): number {
+    private calculateComplexity(lines: { line: string; lineNumber: number }[], _language: string): number {
         let complexity = 1; // Base complexity
 
         for (const { line } of lines) {
