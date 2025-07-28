@@ -186,6 +186,50 @@ export class GitHubService {
         }
     }
 
+    async createPullRequestComment(owner: string, repo: string, pullNumber: number, body: string): Promise<void> {
+        try {
+            await this.octokit.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: pullNumber,
+                body,
+            });
+        } catch (error) {
+            throw new Error(`Failed to create pull request comment: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
+    async createPullRequestReviewComment(
+        owner: string, 
+        repo: string, 
+        pullNumber: number, 
+        body: string,
+        path: string,
+        line: number,
+        side: 'LEFT' | 'RIGHT' = 'RIGHT'
+    ): Promise<void> {
+        try {
+            const pr = await this.octokit.rest.pulls.get({
+                owner,
+                repo,
+                pull_number: pullNumber,
+            });
+
+            await this.octokit.rest.pulls.createReviewComment({
+                owner,
+                repo,
+                pull_number: pullNumber,
+                body,
+                commit_id: pr.data.head.sha,
+                path,
+                line,
+                side,
+            });
+        } catch (error) {
+            throw new Error(`Failed to create pull request review comment: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
     private transformPullRequest(data: any): PullRequest {
         return {
             number: data.number,
