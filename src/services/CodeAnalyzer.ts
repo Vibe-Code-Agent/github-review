@@ -73,10 +73,12 @@ ${code}
 
 Return only valid JSON array of issues, no additional text.`;
 
+        const model = process.env.COPILOT_MODEL || 'gpt-4o';
+
         const response = await axios.post(
             'https://api.githubcopilot.com/chat/completions',
             {
-                model: 'gpt-4o',
+                model: model,
                 max_tokens: 4000,
                 messages: [
                     {
