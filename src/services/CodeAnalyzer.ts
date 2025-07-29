@@ -212,8 +212,38 @@ export class CodeAnalyzer {
         ['less', /\.less$/i],
     ]);
 
+    private testFilePatterns: RegExp[] = [
+        /\.test\./i,
+        /\.spec\./i,
+        /\_test\./i,
+        /\_spec\./i,
+        /test_.*\./i,
+        /spec_.*\./i,
+        /\/__tests__\//i,
+        /\/tests?\//i,
+        /\/spec\//i,
+        /\.stories\./i,
+        /\.e2e\./i,
+        /\.integration\./i,
+        /\.unit\./i
+    ];
+
     async analyzeDiff(request: DiffAnalysisRequest): Promise<FileAnalysis> {
         const { diffContent, filePath, language, includeSecurity = true } = request;
+
+        if (this.isTestFile(filePath)) {
+            return {
+                fileName: filePath,
+                language: language || this.detectLanguage(filePath),
+                lineCount: 0,
+                issues: [],
+                metrics: {
+                    complexity: 1,
+                    maintainability: 100,
+                    duplicateLines: 0,
+                },
+            };
+        }
 
         const detectedLanguage = language || this.detectLanguage(filePath);
         const issues: CodeIssue[] = [];
@@ -383,5 +413,106 @@ export class CodeAnalyzer {
         }
 
         return duplicates;
+    }
+
+    private isTestFile(filePath: string): boolean {
+        return this.testFilePatterns.some(pattern => pattern.test(filePath));
+    }
+
+    async scanCodebaseForUsage(targetFunctionName: string, baseDir: string = process.cwd()): Promise<{
+        calls: Array<{ file: string; line: number; context: string }>;
+        modifications: Array<{ file: string; line: number; context: string; type: 'modification' | 'override' }>;
+    }> {
+        const fs = await import('fs');
+        const path = await import('path');
+        const { promisify } = await import('util');
+        const readFile = promisify(fs.readFile);
+        const readdir = promisify(fs.readdir);
+        const stat = promisify(fs.stat);
+        
+        const calls: Array<{ file: string; line: number; context: string }> = [];
+        const modifications: Array<{ file: string; line: number; context: string; type: 'modification' | 'override' }> = [];
+        
+        const scanDirectory = async (dir: string): Promise<void> => {
+            try {
+                const items = await readdir(dir);
+                
+                for (const item of items) {
+                    const fullPath = path.join(dir, item);
+                    const stats = await stat(fullPath);
+                    
+                    if (stats.isDirectory()) {
+                        if (!item.startsWith('.') && item !== 'node_modules' && item !== 'dist' && item !== 'build') {
+                            await scanDirectory(fullPath);
+                        }
+                    } else if (stats.isFile() && this.isSourceFile(fullPath) && !this.isTestFile(fullPath)) {
+                        await this.scanFileForUsage(fullPath, targetFunctionName, calls, modifications, readFile);
+                    }
+                }
+            } catch (error) {
+                console.error(`Error scanning directory ${dir}:`, error);
+            }
+        };
+        
+        await scanDirectory(baseDir);
+        
+        return { calls, modifications };
+    }
+
+    private isSourceFile(filePath: string): boolean {
+        const sourceExtensions = ['.js', '.jsx', '.ts', '.tsx', '.py', '.java', '.cs', '.cpp', '.c', '.php', '.rb', '.go', '.rs', '.kt', '.swift'];
+        return sourceExtensions.some(ext => filePath.toLowerCase().endsWith(ext));
+    }
+
+    private async scanFileForUsage(
+        filePath: string,
+        targetFunctionName: string,
+        calls: Array<{ file: string; line: number; context: string }>,
+        modifications: Array<{ file: string; line: number; context: string; type: 'modification' | 'override' }>,
+        readFile: (path: string) => Promise<Buffer>
+    ): Promise<void> {
+        try {
+            const content = await readFile(filePath);
+            const lines = content.toString().split('\n');
+            
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                const lineNumber = i + 1;
+                
+                if (!line) continue;
+                
+                const functionCallPattern = new RegExp(`\\b${targetFunctionName}\\s*\\(`, 'g');
+                if (functionCallPattern.test(line)) {
+                    calls.push({
+                        file: filePath,
+                        line: lineNumber,
+                        context: line.trim()
+                    });
+                }
+                
+                const functionDefinitionPattern = new RegExp(`(?:function\\s+${targetFunctionName}|const\\s+${targetFunctionName}\\s*=|${targetFunctionName}\\s*[:=]\\s*(?:function|\\(|async))`, 'g');
+                if (functionDefinitionPattern.test(line)) {
+                    const type = line.includes('override') || line.includes('extends') ? 'override' : 'modification';
+                    modifications.push({
+                        file: filePath,
+                        line: lineNumber,
+                        context: line.trim(),
+                        type
+                    });
+                }
+                
+                const propertyAssignmentPattern = new RegExp(`\\b${targetFunctionName}\\s*=`, 'g');
+                if (propertyAssignmentPattern.test(line) && !functionDefinitionPattern.test(line)) {
+                    modifications.push({
+                        file: filePath,
+                        line: lineNumber,
+                        context: line.trim(),
+                        type: 'modification'
+                    });
+                }
+            }
+        } catch (error) {
+            console.error(`Error scanning file ${filePath}:`, error);
+        }
     }
 } 
