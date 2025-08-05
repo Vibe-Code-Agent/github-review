@@ -47,6 +47,3 @@ updates:
     labels:
       - "dependencies"
       - "automated"
-    auto-merge:
-      enable: true
-      method: "squash"
