@@ -24,7 +24,7 @@
     "author": "Your Name",
     "license": "MIT",
     "dependencies": {
-        "@modelcontextprotocol/sdk": "^1.17.2",
+        "@modelcontextprotocol/sdk": "^1.17.3",
         "@octokit/rest": "^22.0.0",
         "@types/node": "^24.2.1",
         "axios": "^1.6.0",
@@ -34,7 +34,7 @@
     "devDependencies": {
         "@types/jest": "^30.0.0",
         "@types/semver": "^7.5.6",
-        "@typescript-eslint/eslint-plugin": "^8.39.0",
+        "@typescript-eslint/eslint-plugin": "^8.39.1",
         "@typescript-eslint/parser": "^8.38.0",
         "eslint": "^9.33.0",
         "jest": "^30.0.5",
