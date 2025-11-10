@@ -24,7 +24,7 @@
     "author": "Your Name",
     "license": "MIT",
     "dependencies": {
-        "@modelcontextprotocol/sdk": "^1.20.2",
+        "@modelcontextprotocol/sdk": "^1.21.1",
         "@octokit/rest": "^22.0.1",
         "@types/node": "^24.10.0",
         "axios": "^1.13.2",
