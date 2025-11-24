@@ -26,7 +26,7 @@
     "dependencies": {
         "@modelcontextprotocol/sdk": "^1.21.1",
         "@octokit/rest": "^22.0.1",
-        "@types/node": "^24.10.0",
+        "@types/node": "^24.10.1",
         "axios": "^1.13.2",
         "semver": "^7.7.3",
         "typescript": "^5.9.3"
